@@ -1,7 +1,6 @@
 import csv
 import os
 import smtplib
-import time
 from datetime import datetime
 from email.mime.text import MIMEText
 from urllib.parse import quote
@@ -65,29 +64,12 @@ def send_email(to_email, biz_name):
 
 
 # --- 4. LEAD DISCOVERY & WHATSAPP LINK GENERATOR ---
-def find_leads(search_query: str, max_pages: int = 10, include_social_only: bool = True):
+def find_leads(search_query: str):
     gmaps = googlemaps.Client(key=G_MAPS_API_KEY)
-    all_places = []
-    next_token = None
-
-    pages_to_fetch = min(max(int(max_pages), 1), 10)
-
-    for _ in range(pages_to_fetch):
-        response = (
-            gmaps.places(page_token=next_token)
-            if next_token
-            else gmaps.places(query=search_query)
-        )
-        all_places.extend(response.get("results", []))
-        next_token = response.get("next_page_token")
-        if not next_token:
-            break
-        time.sleep(2)
-
+    places = gmaps.places(query=search_query)
     leads = []
-    social_domains = ("instagram.com", "facebook.com", "linktr.ee", "wa.me", "youtube.com")
 
-    for place in all_places:
+    for place in places.get("results", []):
         place_id = place["place_id"]
         details = gmaps.place(
             place_id=place_id,
@@ -96,22 +78,18 @@ def find_leads(search_query: str, max_pages: int = 10, include_social_only: bool
 
         name = details.get("name", "Unknown")
         phone = details.get("formatted_phone_number", "")
-        website = (details.get("website") or "").strip().lower()
+        website = details.get("website")
         address = details.get("formatted_address", "")
 
-        has_real_website = bool(website) and not (
-            include_social_only and any(domain in website for domain in social_domains)
-        )
-
-        if not has_real_website and phone:
+        if not website and phone:
             phone_fmt = phone.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
             if not phone_fmt.startswith("+"):
-                phone_fmt = "+91" + phone_fmt.lstrip("0")
+                phone_fmt = "+91" + phone_fmt
 
             digits_only = phone_fmt.lstrip("+")
             wa_msg = (
                 f"Hi {name} Team!\n\n"
-                f"I found your business on Google Maps, but noticed you don't have a dedicated website yet. You are likely losing ready-to-pay clients every day to competitors who have an online storefront.\n\n"
+                f"I found your business on Google Maps, but noticed your 'Website' button is completely empty. You are likely losing ready-to-pay clients every day to competitors who have an online storefront.\n\n"
                 f"While traditional agencies charge a fortune, we build premium, high-converting websites for businesses like yours at a fraction of the cost.\n\n"
                 f"To prove we are the perfect fit, I didn't just come to pitch. I've already designed a custom, fully functional website preview specifically for {name}. No strings attached!\n\n"
                 f"Reply 'DEMO' and I'll send the live link right over!\n"
@@ -123,7 +101,6 @@ def find_leads(search_query: str, max_pages: int = 10, include_social_only: bool
                 {
                     "Business Name": name,
                     "Phone": phone_fmt,
-                    "Current Link": website if website else "None",
                     "Address": address,
                     "WhatsApp Link": wa_link,
                 }
@@ -145,31 +122,15 @@ query_input = st.text_input(
     placeholder="e.g., Gyms in Hyderabad, Cafes in Dubai, Plumbers in London",
 )
 
-max_pages = st.slider(
-    "Pages to scan (~20 places per page, max 10)",
-    min_value=1,
-    max_value=3,
-    value=3,
-)
-
-include_social = st.checkbox(
-    "Treat Instagram/Facebook/Linktree links as 'No Website'",
-    value=True,
-)
-
 if st.button("Find Leads", type="primary"):
     if not G_MAPS_API_KEY:
         st.error("GOOGLE_MAPS_API_KEY missing in Streamlit Secrets.")
     elif not query_input.strip():
         st.warning("Search query enter cheyyi bro.")
     else:
-        with st.spinner(f"Scanning up to {max_pages} pages on Google Maps..."):
+        with st.spinner("Scanning Google Maps for businesses without websites..."):
             try:
-                st.session_state.leads = find_leads(
-                    query_input.strip(),
-                    max_pages=max_pages,
-                    include_social_only=include_social,
-                )
+                st.session_state.leads = find_leads(query_input.strip())
             except Exception as e:
                 st.error(f"Google Maps API Error: {e}")
 
