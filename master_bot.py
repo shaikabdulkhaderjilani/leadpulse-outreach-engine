@@ -65,12 +65,14 @@ def send_email(to_email, biz_name):
 
 
 # --- 4. LEAD DISCOVERY & WHATSAPP LINK GENERATOR ---
-def find_leads(search_query: str, max_pages: int = 5, include_social_only: bool = True):
+def find_leads(search_query: str, max_pages: int = 10, include_social_only: bool = True):
     gmaps = googlemaps.Client(key=G_MAPS_API_KEY)
     all_places = []
     next_token = None
 
-    for _ in range(max_pages):
+    pages_to_fetch = min(max(int(max_pages), 1), 10)
+
+    for _ in range(pages_to_fetch):
         response = (
             gmaps.places(page_token=next_token)
             if next_token
@@ -104,12 +106,12 @@ def find_leads(search_query: str, max_pages: int = 5, include_social_only: bool 
         if not has_real_website and phone:
             phone_fmt = phone.replace(" ", "").replace("-", "").replace("(", "").replace(")", "")
             if not phone_fmt.startswith("+"):
-                phone_fmt = "+91" + phone_fmt
+                phone_fmt = "+91" + phone_fmt.lstrip("0")
 
             digits_only = phone_fmt.lstrip("+")
             wa_msg = (
                 f"Hi {name} Team!\n\n"
-                f"I found your business on Google Maps, but noticed your 'Website' button is completely empty. You are likely losing ready-to-pay clients every day to competitors who have an online storefront.\n\n"
+                f"I found your business on Google Maps, but noticed you don't have a dedicated website yet. You are likely losing ready-to-pay clients every day to competitors who have an online storefront.\n\n"
                 f"While traditional agencies charge a fortune, we build premium, high-converting websites for businesses like yours at a fraction of the cost.\n\n"
                 f"To prove we are the perfect fit, I didn't just come to pitch. I've already designed a custom, fully functional website preview specifically for {name}. No strings attached!\n\n"
                 f"Reply 'DEMO' and I'll send the live link right over!\n"
@@ -144,10 +146,10 @@ query_input = st.text_input(
 )
 
 max_pages = st.slider(
-    "Pages to scan (~20 places per page)",
+    "Pages to scan (~20 places per page, max 10)",
     min_value=1,
-    max_value=10,
-    value=5,
+    max_value=3,
+    value=3,
 )
 
 include_social = st.checkbox(
